@@ -1,0 +1,40 @@
+import {createElement} from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {readFileSync,existsSync} from 'node:fs';
+import type {Server} from 'node:http';
+import {afterAll,beforeAll,describe,expect,it} from 'vitest';
+import {SubmissionCorrection} from '../src/web/components/InstructorActions.js';
+import {InstructorDashboard} from '../src/web/components/InstructorDashboard.js';
+import {StudentDashboard} from '../src/web/components/StudentDashboardV6.js';
+import {DecisionWorkspace} from '../src/web/components/DecisionWorkspaceV6.js';
+import type {InstructorView,StudentView} from '../src/web/api.js';
+import {instructorProjection,studentProjection} from '../src/application/projections.js';
+import {SimulationService} from '../src/application/service.js';
+import {teamAccessCode} from '../src/application/access.js';
+import {MemoryGameRepository} from '../src/persistence/repository.js';
+import {createApp} from '../src/server/index.js';
+import {roundPayloads} from '../src/web/rounds.js';
+
+const r1={opening_posture:'pause_pilot',savings_commitment_made:true,savings_commitment_usd:123456,memo_handling:'not_found'};
+const markup=(round:number,payload:Record<string,unknown>)=>renderToStaticMarkup(createElement(SubmissionCorrection,{submission:{id:'fixture',round,payload,submitter:'fixture',submittedAt:'2026-09-17T00:00:00Z'},teamName:'Fixture',onSave:async()=>{}}));
+
+describe('final cleanup shared correction controls',()=>{
+ it('renders the instructor form with submitted selections, boolean and amount prefilled, without raw JSON',()=>{const html=markup(1,r1);expect(html).toContain('Instructor correction');expect(html).toContain('value="pause_pilot" selected=""');expect(html).toContain('value="123456"');expect(html).toContain('Save instructor correction');expect(html).not.toContain('Submitted lever values (JSON)');expect(html).not.toContain('&quot;opening_posture&quot;');});
+ it.each([2,3,4,5,6,7,8,9,10])('reuses the normal R%s decision controls with submitted payload',round=>{const payload=structuredClone(roundPayloads[round]),html=markup(round,payload);expect(html).toContain('Save instructor correction');expect(html).toContain('decision-form');expect(html).not.toContain('Submitted lever values (JSON)');expect(payload).toEqual(roundPayloads[round]);});
+ it('renders the submitted R9 crisis branch rather than no-crisis defaults',()=>{const html=markup(9,{crisis_responses:{test_crisis:{containment:'halt_process',disclosure:'board_proactive',rollback:true}}});expect(html).toContain('value="halt_process" selected=""');expect(html).not.toContain('Figure Type');});
+ it('retains unchanged student defaults and submit label',()=>{const html=renderToStaticMarkup(createElement(DecisionWorkspace,{round:6,submitted:false,onSubmit:async()=>{}}));expect(html).toContain('Submit decision');expect(html).not.toContain('Save instructor correction');expect(html).not.toContain('placeholder=');});
+ it('removes obsolete components, with active V6 imports and CSS order retained',()=>{expect(existsSync('src/web/components/StudentDashboard.tsx')).toBe(false);expect(existsSync('src/web/components/DecisionWorkspace.tsx')).toBe(false);const app=readFileSync('src/web/App.tsx','utf8');expect(app).toContain('StudentDashboardV6.js');expect(app).toMatch(/documents-debrief.css[\s\S]*entry-instructor.css[\s\S]*round-progression.css[\s\S]*document-readability.css/);});
+});
+
+describe('final cleanup correction and refresh API boundary',()=>{
+ const repo=new MemoryGameRepository(),service=new SimulationService(repo);
+ let server:Server,base:string,token:string,studentToken:string,gameId:string;
+ const request=async(path:string,method='GET',credential=token,body?:unknown)=>{const response=await fetch(base+path,{method,headers:{'content-type':'application/json',authorization:'Bearer '+credential},...(body?{body:JSON.stringify(body)}:{})});return {status:response.status,body:await response.json()};};
+ beforeAll(async()=>{const g=service.create(['Fixture A','Fixture B']);gameId=g.id;service.submit(gameId,'team-1',r1,'fixture');server=createApp(repo,'temporary-test-only').listen(0,'127.0.0.1');await new Promise<void>(resolve=>server.once('listening',resolve));base='http://127.0.0.1:'+(server.address() as {port:number}).port;token=(await request('/api/instructor/session','POST','',{passphrase:'temporary-test-only'})).body.token;studentToken=(await request('/api/student/session','POST','',{gameId,teamCode:teamAccessCode(gameId,'team-1')})).body.token;});
+ afterAll(async()=>{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));});
+ it('opens correction only for accepted open-round submissions and never on the student surface',()=>{const view=instructorProjection(service.get(gameId)) as unknown as InstructorView;expect(renderToStaticMarkup(createElement(InstructorDashboard,{view,onClose:async()=>{},onCorrect:async()=>{}}))).toContain('Save instructor correction');expect(renderToStaticMarkup(createElement(InstructorDashboard,{view:{...view,game:{...view.game,status:'completed'}},onClose:async()=>{},onCorrect:async()=>{}}))).not.toContain('Save instructor correction');const student=studentProjection(service.get(gameId),'team-1') as StudentView;expect(renderToStaticMarkup(createElement(StudentDashboard,{view:student,onSubmit:async()=>{},onAccess:async()=>{},onChat:async()=>''}))).not.toContain('Save instructor correction');});
+ it('saves a valid form payload through the unchanged correction endpoint and exact audit shape',async()=>{const result=await request('/api/games/'+gameId+'/teams/team-1/submissions/1/correction','POST',token,{payload:{...r1,opening_posture:'restart_discovery'}});expect(result.status).toBe(200);const s=result.body.teams[0].submissions[0];expect(s.payload.opening_posture).toBe('restart_discovery');expect(Object.keys(s.corrections[0]).sort()).toEqual(['gameId','teamId','round','action','actor','timestamp','changes'].sort());expect(s.corrections[0].changes).toEqual([{field:'opening_posture',oldValue:'pause_pilot',newValue:'restart_discovery'}]);});
+ it('returns identical validation messages for invalid student and correction payloads without adding audit',async()=>{const payload={...r1,savings_commitment_usd:-1},before=structuredClone(service.get(gameId).teams[0].submissions[0]);const correction=await request('/api/games/'+gameId+'/teams/team-1/submissions/1/correction','POST',token,{payload});const join=await request('/api/student/session','POST','',{gameId,teamCode:teamAccessCode(gameId,'team-2')});const student=await request('/api/games/'+gameId+'/teams/team-2/submissions','POST',join.body.token,{payload});expect(correction.status).toBe(400);expect(student.status).toBe(400);expect(correction.body.error).toBe(student.body.error);expect(service.get(gameId).teams[0].submissions[0]).toEqual(before);});
+ it('does not allow a student credential to correct',async()=>{expect((await request('/api/games/'+gameId+'/teams/team-1/submissions/1/correction','POST',studentToken,{payload:r1})).status).toBe(404);});
+ it('re-fetches the same game and renders a submission made in another session after refresh',async()=>{const path='/api/games/'+gameId+'/instructor',before=await request(path);expect(before.body.teams[1].submissions).toHaveLength(0);const joined=await request('/api/student/session','POST','',{gameId,teamCode:teamAccessCode(gameId,'team-2')});expect((await request('/api/games/'+gameId+'/teams/team-2/submissions','POST',joined.body.token,{payload:r1})).status).toBe(201);const after=await request(path);expect(after.body.game.id).toBe(gameId);expect(after.body.teams[1].submissions).toHaveLength(1);const html=renderToStaticMarkup(createElement(InstructorDashboard,{view:after.body,onClose:async()=>{},onRefresh:async()=>{}}));expect(html).toContain('Refresh teams');expect(html).not.toContain('Outstanding');const app=readFileSync('src/web/App.tsx','utf8');expect(app).toContain('onRefresh={async()=>setInstructor(await api.instructor(instructor.game.id,instructorToken))}');});
+});

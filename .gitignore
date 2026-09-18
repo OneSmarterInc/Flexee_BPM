@@ -1,0 +1,5 @@
+dist/
+.bpm-data/
+node_modules/
+.env
+*.zip

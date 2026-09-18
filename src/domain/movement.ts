@@ -1,0 +1,1 @@
+export function applyAsymmetricMovement(key:string,previous:number,rawDelta:number,min=0,max=100){const factor=key==='technical_partnership'&&rawDelta>0?.6:1;const result=Math.max(min,Math.min(max,previous+rawDelta*factor));return {factor,appliedDelta:result-previous,result};}

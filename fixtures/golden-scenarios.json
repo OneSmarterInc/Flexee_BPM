@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "bpm-v1",
+  "executableFixture": "test/golden.test.ts",
+  "scenarios": {
+    "golden_triumph": {"rounds":"R1-R10","expected":"No crisis, defensible benefit above $8M, five positive stakeholders, and final Triumph."},
+    "golden_no_crisis": {"rounds":"R1-R10","expected":"Maximum eligible exposure below 40 and an actual R9 benefit review."},
+    "competent_with_scars": {"rounds":"R1-R10","expected":"One contained freeze collision and a Win with Scars outcome."},
+    "B_automation_without_governance": {"rounds":"R1-R10","expected":"Calculated top risks fire, shared attention applies, and crisis damage materially reduces benefit."},
+    "C_credibility_failure": {"rounds":"R1-R10","expected":"Restatement exposure rises and inherited-baseline arithmetic makes Triumph unreachable."},
+    "D_political_failure": {"rounds":"R1-R10","expected":"Analytical score remains strong while blame, IT exclusion, and union exclusion damage relationships and execution risk."}
+  }
+}
