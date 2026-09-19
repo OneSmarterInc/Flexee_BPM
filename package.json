@@ -9,7 +9,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0",
     "test": "vitest run",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && npm run build:server && vite build",
+    "build:server": "tsc -p tsconfig.server.json && node scripts/copy-server-assets.mjs",
+    "start": "node dist/backend/server/index.js",
     "migrate": "tsx scripts/migrate.ts",
     "seed": "tsx scripts/seed.ts",
     "zip": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1"
