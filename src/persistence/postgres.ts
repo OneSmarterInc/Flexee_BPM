@@ -30,7 +30,15 @@ export class PostgresGameRepository implements AsyncGameRepository {
   if(!connectionString)throw new Error('DATABASE_URL is required for PostgreSQL');
   let url:URL;try{url=new URL(connectionString);}catch{throw new Error('DATABASE_URL must be a PostgreSQL URL');}
   if(!['postgres:','postgresql:'].includes(url.protocol))throw new Error('DATABASE_URL must be a PostgreSQL URL');
-  this.pool=new Pool({max:10,connectionTimeoutMillis:10000,...options,connectionString});
+  this.pool=new Pool({
+  max:10,
+  connectionTimeoutMillis:10000,
+  ssl: {
+    rejectUnauthorized:false
+  },
+  ...options,
+  connectionString
+});
   this.pool.on('error',()=>console.error('PostgreSQL idle connection failed; subsequent requests will reconnect.'));
  }
  async initialize(){await migratePostgres(this.pool);}
