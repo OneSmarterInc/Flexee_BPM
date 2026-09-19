@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import {existsSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -12,6 +13,12 @@ import {studentErrorMessage} from '../application/errors.js';
 import {PostgresGameRepository} from '../persistence/postgres.js';
 export function createApp(repo:GameRepository|AsyncGameRepository,passphrase=process.env.FLEXEE_INSTRUCTOR_PASSPHRASE){
 const app=express(),service=new PersistentSimulationService(repo),sessions=new StudentSessionRegistry(),instructors=new InstructorSessionRegistry(passphrase);
+app.use(cors({
+origin:['https://flexee-bpm.vercel.app','http://localhost:5173'],
+methods:['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+allowedHeaders:['Content-Type','Authorization'],
+optionsSuccessStatus:204,
+}));
 const notFound=(r:express.Response)=>r.status(404).json({error:'Not found'});
 const bearer=(q:express.Request)=>q.header('authorization')?.startsWith('Bearer ')?q.header('authorization')!.slice(7):undefined;
 app.use('/api',(_q,r,next)=>{r.setHeader('Cache-Control','no-store');next();});
