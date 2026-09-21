@@ -1,4 +1,5 @@
 dist/
+files/
 .bpm-data/
 node_modules/
 .env
