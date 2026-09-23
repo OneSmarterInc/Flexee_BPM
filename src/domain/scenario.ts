@@ -1,3 +1,4 @@
+import {round8Conditions,selectRound8Condition} from './round8-conditions.js';
 import type {BpmConfig,RiskId,RoundNarrativeSnapshot,RoundNumber,RoundSubmission,TeamState} from './types.js';
 
 type Candidate={id:string;conditionId:string;matches:(state:TeamState,submissions:RoundSubmission[])=>boolean;text:string};
@@ -34,13 +35,7 @@ const rounds:Record<RoundNumber,RoundContent>={
    {id:'r6-clinical-path-open',conditionId:'r5_physicians_in_design_room',matches:(_,s)=>has(s,5,'design_room','physicians'),text:`Moreau will discuss Option D on a narrow path: one service line, with Anand seeing it before the medical staff.`}
   ],defaultId:'r6-room-silent',defaultText:`No one supplies hidden calendar slack or a narrow clinical path. The advertised build dates remain unchanged.`},
  7:{base:`Castellanos sends a fourteen-page readiness assessment Monday night with no summary. Forty-one interviews cover six functions and two campuses. West staff can describe the new work. East staff largely cannot; three believe the project was cancelled. Nobody was hostile. "Hostility would be easier." Okonkwo writes that the board meeting is three weeks out and assumes go-live remains the 14th. There is $1.4 million left to divide between readiness and contingency.`},
- 8:{base:`Sunday night. Cutover begins at 6:00 Monday if it happens. Technical readiness is green. Process readiness is green. Staff readiness is amber. A fourth indicator carries what prior decisions left unresolved. Okonkwo has called twice to ask whether you need anything. Sylvia is in the building though she did not have to be.`,variants:[
-   {id:'r8-exception-unvalidated',conditionId:'automation_risk_debt_high',matches:s=>(s.scalars.automation_risk_debt??0)>=55,text:`Exception handling — unvalidated. Projected volume at go-live is 340 to 900 per day; the range is wide because the rules have not run against production data.`},
-   {id:'r8-change-window-constrained',conditionId:'technical_partnership_low',matches:s=>(s.scalars.technical_partnership??0)<35,text:`Change window — constrained. Any defect found after 6:00 Monday waits eleven days for a patch.`},
-   {id:'r8-workforce-notice',conditionId:'clean_sheet_notice_incomplete',matches:(_,s)=>prior(s,5,'redesign_ambition')==='clean_sheet'&&!has(s,5,'design_room','union'),text:`Workforce — notice period incomplete. Legal has flagged it. Nobody has said what happens if you proceed.`},
-   {id:'r8-process-variance',conditionId:'discovery_shallow',matches:s=>(s.scalars.discovery_depth??0)<50,text:`Process variance — undocumented. Four east-campus workflows do not match the documented process and were found Friday.`},
-   {id:'r8-vendor-transition',conditionId:'external_sourcing',matches:(_,s)=>prior(s,6,'sourcing')!=='retain_internal',text:`Vendor transition — month one. The BPO has staffed to plan and has not yet run a full day of volume.`}
-  ],defaultId:'r8-controlled-opening',defaultText:`The fourth indicator records no additional exception beyond the three visible readiness dimensions.`},
+ 8:{base:`Sunday night. Cutover begins at 6:00 Monday if it happens. The readiness indicators came in at four o'clock. A fourth indicator carries what prior decisions left unresolved. Okonkwo has called twice to ask whether you need anything. Sylvia is in the building though she did not have to be.`,variants:round8Conditions,defaultId:'r8-controlled-opening',defaultText:`The fourth indicator records no additional exception beyond the three visible readiness dimensions.`},
  9:{base:`Attention is finite. Three decisions attach to each crisis: what you do, what you say and to whom, and whether you pull the affected work back.`,variants:(Object.keys(crisisText) as RiskId[]).map(id=>({id:`r9-${id}`,conditionId:`crisis_${id}_selected`,matches:s=>s.crises.some(x=>x.id===id),text:crisisText[id]})),defaultId:'r9-benefit-review',defaultText:`The board finance committee moves its benefit realization review forward by three weeks. You have five days. The process is nine days old; the numbers are real and thin. Registration time is down and the authorization queue has stopped growing, which is not the same as shrinking. Nothing is on fire. You must explain why something that is working is not yet finished.`},
  10:{base:`The board finance committee meets Thursday at 2:00. Project charge codes close at month-end, finance's analysts return, and vendor implementation staffing falls from eleven people to two. Registration time is down; the authorization queue has begun, slightly, to shrink. Cost to collect will not move measurably for two quarters. Okonkwo asks to align on Thursday. Sylvia schedules a ninety-minute Friday transition with a printed agenda.`,variants:[
    {id:'r10-real-ownership',conditionId:'ntende_real_owner',matches:(state,s)=>(prior(s,5,'process_ownership')==='ntende'||prior(s,5,'process_ownership')==='new_role')&&state.stakeholders.ntende.trust>=50,text:`Sylvia says her first action is to remove the 2023 write-ups because the reps have carried them for two years and nobody on the project opened an HR file. She says it as a to-do, not a rebuke.`},
@@ -51,9 +46,11 @@ const rounds:Record<RoundNumber,RoundContent>={
 
 export function selectRoundNarrative(round:RoundNumber,state:TeamState,submissions:RoundSubmission[],_config:BpmConfig):RoundNarrativeSnapshot{
  void _config;
- const spec=rounds[round],conditions=(spec.variants??[]).map(v=>({conditionId:v.conditionId,matched:v.matches(state,submissions)}));
+ const spec=rounds[round];
+ if(round===8){const {selected,additionalCount:count,conditionResults}=selectRound8Condition(state,submissions);return {round,variantId:selected?.id??spec.defaultId!,conditionResults,renderedContent:[spec.base,selected?.text??spec.defaultText,count?`Plus ${count} other${count===1?'':'s'}.`:undefined].filter(Boolean).join('\n\n')};}
+ const conditions=(spec.variants??[]).map(v=>({conditionId:v.conditionId,matched:v.matches(state,submissions)}));
  const fired=(spec.variants??[]).filter((_,index)=>conditions[index].matched);
- if(round===8&&fired.length){const selected=fired[0],count=fired.length-1;return {round,variantId:selected.id,conditionResults:conditions,renderedContent:[spec.base,selected.text,count?`Plus ${count} other${count===1?'':'s'}.`:undefined].filter(Boolean).join('\n\n')};}
+
  const variantId=fired.length?fired.map(v=>v.id).join('+'):(spec.defaultId??`r${round}-base`);
  const additions=fired.length?fired.map(v=>v.text):(spec.defaultText?[spec.defaultText]:[]);
  return {round,variantId,conditionResults:conditions,renderedContent:[spec.base,...additions].join('\n\n')};

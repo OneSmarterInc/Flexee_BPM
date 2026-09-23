@@ -1,6 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {Pool} from 'pg';
 import {PostgresGameRepository} from '../../src/persistence/postgres.js';
+import {postgresConnectionConfig} from '../../src/persistence/postgres-connection.js';
 
 export const postgresEnabled=Boolean(process.env.TEST_DATABASE_URL);
 export function testDatabaseUrl(value=process.env.TEST_DATABASE_URL,production=process.env.DATABASE_URL){
@@ -14,12 +15,12 @@ export function testDatabaseUrl(value=process.env.TEST_DATABASE_URL,production=p
 }
 export async function isolatedPostgres(initialize=true){
  const url=testDatabaseUrl(),schema=`flexee_test_${randomUUID().replaceAll('-','')}`;
- const admin=new Pool({connectionString:url,max:1,connectionTimeoutMillis:10000});
+ const admin=new Pool(postgresConnectionConfig(url,{max:1}));
  const options={options:`-c search_path=${schema}`,max:6};
  const peers:PostgresGameRepository[]=[];
  await admin.query(`CREATE SCHEMA "${schema}"`);
  const repo=new PostgresGameRepository(url,options);peers.push(repo);
- const sql=new Pool({connectionString:url,...options});
+ const sql=new Pool(postgresConnectionConfig(url,options));
  const close=async()=>{
   await Promise.all(peers.map(peer=>peer.close()));await sql.end();
   // Only the UUID schema created by this helper may be removed.

@@ -2,6 +2,7 @@ import {Pool,type PoolClient,type PoolConfig} from 'pg';
 import type {Game,Team} from '../domain/types.js';
 import {MemoryGameRepository,type AsyncGameRepository,type GameRepository} from './repository.js';
 import {migratePostgres} from './postgres-migrations.js';
+import {postgresConnectionConfig} from './postgres-connection.js';
 
 type Row=Record<string,unknown>;
 const decode=<T>(value:unknown):T=>{try{return JSON.parse(String(value)) as T;}catch{throw new Error('Stored game data could not be read. Please contact your instructor.');}};
@@ -30,15 +31,7 @@ export class PostgresGameRepository implements AsyncGameRepository {
   if(!connectionString)throw new Error('DATABASE_URL is required for PostgreSQL');
   let url:URL;try{url=new URL(connectionString);}catch{throw new Error('DATABASE_URL must be a PostgreSQL URL');}
   if(!['postgres:','postgresql:'].includes(url.protocol))throw new Error('DATABASE_URL must be a PostgreSQL URL');
-  this.pool=new Pool({
-  max:10,
-  connectionTimeoutMillis:10000,
-  ssl: {
-    rejectUnauthorized:false
-  },
-  ...options,
-  connectionString
-});
+  this.pool=new Pool(postgresConnectionConfig(connectionString,options));
   this.pool.on('error',()=>console.error('PostgreSQL idle connection failed; subsequent requests will reconnect.'));
  }
  async initialize(){await migratePostgres(this.pool);}

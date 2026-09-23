@@ -1,5 +1,7 @@
 # Phase 3 student-readable playthrough
 
+> Historical evidence notice — 2026-09-22: The four R8 passages below retain the original green/green/amber opening claims from these Phase 3 runs. That opening wording is superseded by the accepted Round 8 Dashboard Completion: the current opening says “The readiness indicators came in at four o'clock.” Actual statuses now appear on the frozen R7-close dashboard; staff status uses the R7 readiness score, and narrative/fourth-indicator selection shares one condition function. These recorded passages are preserved, not regenerated, and are not current R8 wording. See [current acceptance](PHASE8_VERIFICATION_REPORT.md).
+
 The narrative below is the actual rendered content persisted by each complete deterministic run. Internal IDs and conditions are intentionally omitted here.
 
 ## Path A — Disciplined
@@ -569,4 +571,3 @@ marchetti: “The evidence and the decision are at the same level. What remains 
 castellanos: “What is still open is who hears from you next and who has authority on the first shift.”
 
 **Final result:** triumph; realized benefit: $12,101,660; defensible benefit: $9,916,856; crises fired: 0.
-
