@@ -32,9 +32,10 @@ Use the same runtime URL in seed and server terminals. `PORT`, `VITE_API_BASE`, 
 
 1. `001_initial_schema.sql`: all tables, current columns and constraints.
 2. `002_query_indexes.sql`: game creation ordering, team/game lookup, submission/game lookup, transcript/game and transcript chronological lookup.
-3. `verify.sql`: read-only verification, not a migration.
+3. `003_team_access_codes.sql`: optional six-character codes for instructor-created sessions; unique within each game. Existing NULL codes retain legacy login.
+4. `verify.sql`: read-only verification, not a migration.
 
-Use **`npm.cmd run migrate`** for steps 1–2 rather than executing the files individually. The runner owns BEGIN/COMMIT/ROLLBACK, serializes concurrent runners, records SHA-256 checksums, rejects changed or unknown migrations, and commits the schema atomically. A failure rolls back. Do not manually populate the ledger to bypass a mismatch; restore/reconcile the correct migration release. Future changes require a new numbered migration.
+Use **`npm.cmd run migrate`** for steps 1–3 rather than executing the files individually. The runner owns BEGIN/COMMIT/ROLLBACK, serializes concurrent runners, records SHA-256 checksums, rejects changed or unknown migrations, and commits the schema atomically. A failure rolls back. Do not manually populate the ledger to bypass a mismatch; restore/reconcile the correct migration release. Future changes require a new numbered migration.
 
 Server and seed startup also await this runner before serving requests/creating games. The configured deployment role therefore needs schema DDL privileges for this release, in addition to ordinary data access. A separately privileged deploy-only migration role would require a future explicit startup-policy change. No game is seeded by schema installation. Pool default is ten connections per runtime process. SIGINT/SIGTERM waits for HTTP shutdown and pool closure.
 

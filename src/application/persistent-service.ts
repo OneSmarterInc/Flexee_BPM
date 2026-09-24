@@ -13,6 +13,10 @@ export class PersistentSimulationService {
   return new SimulationService(this.repo).create(...args);
  }
  async get(id:string){const game=await this.repo.get(id);if(!game)throw new Error('Game not found');return game;}
+ async createSession(count:unknown){
+  if('withCreation' in this.repo)return this.repo.withCreation(snapshot=>new SimulationService(snapshot).createSession(count));
+  return new SimulationService(this.repo).createSession(count);
+ }
  async list(){return this.repo.list();}
  submit(...args:Parameters<SimulationService['submit']>){return this.mutation(args[0],service=>service.submit(...args));}
  correct(...args:Parameters<SimulationService['correct']>){return this.mutation(args[0],service=>service.correct(...args));}

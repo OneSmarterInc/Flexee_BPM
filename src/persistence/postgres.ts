@@ -3,6 +3,7 @@ import type {Game,Team} from '../domain/types.js';
 import {MemoryGameRepository,type AsyncGameRepository,type GameRepository} from './repository.js';
 import {migratePostgres} from './postgres-migrations.js';
 import {postgresConnectionConfig} from './postgres-connection.js';
+import {logFailure} from '../application/diagnostics.js';
 
 type Row=Record<string,unknown>;
 const decode=<T>(value:unknown):T=>{try{return JSON.parse(String(value)) as T;}catch{throw new Error('Stored game data could not be read. Please contact your instructor.');}};
@@ -37,13 +38,13 @@ export class PostgresGameRepository implements AsyncGameRepository {
  async initialize(){await migratePostgres(this.pool);}
  close(){return this.closing??=this.pool.end();}
  private async transaction<T>(operation:(client:PoolClient)=>Promise<T>,readOnly=false):Promise<T>{
-  const client=await this.pool.connect().catch(()=>{throw databaseFailure();});
+  const client=await this.pool.connect().catch(error=>{logFailure('database_failed',error);throw databaseFailure();});
   try{
    await client.query(readOnly?'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY':'BEGIN');
    const result=await operation(client);await client.query('COMMIT');return result;
   }catch(error){
-   try{await client.query('ROLLBACK');}catch{throw databaseFailure();}
-   if(error&&typeof error==='object'&&'code' in error)throw databaseFailure();
+   try{await client.query('ROLLBACK');}catch(rollbackError){logFailure('database_failed',rollbackError);throw databaseFailure();}
+   if(error&&typeof error==='object'&&'code' in error){logFailure('database_failed',error);throw databaseFailure();}
    throw error;
   }
   finally{client.release();}
@@ -99,13 +100,13 @@ export class PostgresGameRepository implements AsyncGameRepository {
    const artifact=x.artifact_json?decode<Team['artifacts'][number]>(x.artifact_json):{id:String(x.id),round:Number(x.round),type:String(x.type),studentContent:decode(x.student_content),hiddenMetadata:decode(x.hidden_metadata)} as Team['artifacts'][number];
    if(!artifact.title&&artifact.type==='round3_analysis')artifact.title='Round 3 analysis';return artifact;
   });
-  return {id,name:String(row.name),members:decode(row.members),submissions,results,roundNarratives:decode(row.round_narratives??'[]'),currentState:decode(row.current_state),stateHistory,transcripts,artifacts};
+  return {id,name:String(row.name),...(row.access_code?{accessCode:String(row.access_code)}:{}),members:decode(row.members),submissions,results,roundNarratives:decode(row.round_narratives??'[]'),currentState:decode(row.current_state),stateHistory,transcripts,artifacts};
  }
  private async writeGame(client:PoolClient,game:Game,insert:boolean){
   if(insert)await client.query('INSERT INTO games(id,simulation_id,config_version,config_hash,config_snapshot,active_round,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[game.id,game.simulationId,game.configVersion,game.configHash,JSON.stringify(game.configSnapshot),game.activeRound,game.status,game.createdAt]);
   else await client.query('UPDATE games SET active_round=$1,status=$2,config_snapshot=$3,config_hash=$4 WHERE id=$5',[game.activeRound,game.status,JSON.stringify(game.configSnapshot),game.configHash,game.id]);
   for(const team of game.teams){
-   const written=await client.query('INSERT INTO teams(id,game_id,name,members,current_state,outcome,round_narratives) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET name=excluded.name,members=excluded.members,current_state=excluded.current_state,outcome=excluded.outcome,round_narratives=excluded.round_narratives WHERE teams.game_id=excluded.game_id',[team.id,game.id,team.name,JSON.stringify(team.members),JSON.stringify(team.currentState),team.currentState.outcome??null,JSON.stringify(team.roundNarratives)]);
+   const written=await client.query('INSERT INTO teams(id,game_id,name,members,current_state,outcome,round_narratives,access_code) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(id) DO UPDATE SET name=excluded.name,members=excluded.members,current_state=excluded.current_state,outcome=excluded.outcome,round_narratives=excluded.round_narratives,access_code=excluded.access_code WHERE teams.game_id=excluded.game_id',[team.id,game.id,team.name,JSON.stringify(team.members),JSON.stringify(team.currentState),team.currentState.outcome??null,JSON.stringify(team.roundNarratives),team.accessCode??null]);
    if(written.rowCount!==1)throw new Error('Team ID belongs to another game');
    for(const s of team.submissions)await client.query("INSERT INTO submissions(id,game_id,team_id,round,payload,submitter,submitted_at,config_version,config_hash,kind,corrections) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,corrections=excluded.corrections WHERE submissions.game_id=$12 AND submissions.team_id=$13 AND submissions.round=$14 AND $15::text!='completed'",[s.id,s.gameId,s.teamId,s.round,JSON.stringify(s.payload),s.submitter,s.submittedAt,s.configVersion,s.configHash,s.kind??'submitted',JSON.stringify(s.corrections??[]),game.id,team.id,game.activeRound,game.status]);
    for(const r of team.results)await client.query('INSERT INTO round_results(team_id,round,result) VALUES($1,$2,$3) ON CONFLICT(team_id,round) DO UPDATE SET result=excluded.result',[team.id,r.round,JSON.stringify(r)]);

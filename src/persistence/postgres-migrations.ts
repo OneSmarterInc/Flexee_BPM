@@ -2,7 +2,7 @@ import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import type {Pool} from 'pg';
 
-const versions=['001_initial_schema.sql','002_query_indexes.sql'] as const;
+const versions=['001_initial_schema.sql','002_query_indexes.sql','003_team_access_codes.sql'] as const;
 export async function migratePostgres(pool:Pool){
  const client=await pool.connect();
  try{

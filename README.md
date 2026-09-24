@@ -21,6 +21,10 @@ Open `http://localhost:3001/`; instructor entry is `http://localhost:3001/?view=
 
 ## Seed a pilot section
 
+Instructors can instead sign in at `/?view=instructor`, choose **Create New Simulation Session**, and create 1–12 teams. The new page (`/?view=instructor-create`) returns the Game ID, names and six-character team codes, with copy and control-room buttons. Students continue using the existing Game ID / Team Code entry. Save the access details before leaving the success page. Existing games and their older codes are unchanged.
+
+The backend applies `SQL/003_team_access_codes.sql` through the existing migration runner on startup (or `npm run migrate`). It adds a nullable team access-code column and a per-game uniqueness index; it does not change simulation state or existing codes.
+
 In another terminal, using the same database setting as the server:
 
 ```powershell
@@ -47,7 +51,31 @@ npm.cmd run build
 
 ## Project documents
 
-For the proposed Vercel frontend / Render backend / Render PostgreSQL topology, see [deployment readiness](reports/DEPLOYMENT_READINESS_REPORT.md). Direct cross-origin browser API calls are currently blocked by missing CORS/preflight support. Deployment requires an approved transport configuration, credential rotation where applicable, and the manual security checks in that report. No hosting configuration or deployment has been applied.
+For the current Vercel frontend / Render backend / Render PostgreSQL topology, see the [Render deployment checklist](reports/RENDER_DEPLOYMENT_CHECKLIST.md), [production operations](docs/PRODUCTION_OPERATIONS.md), and [production verification report](reports/PRODUCTION_FINAL_REPORT.md). CORS/preflight support and a compiled production start command exist. Historical deployment reports describe earlier states; outstanding live-database and security acceptance checks are recorded in the current report. This hardening pass did not deploy anything.
+
+## Production configuration and workflows
+
+The Express API delegates to the application service and deterministic domain engine, then persists through the PostgreSQL repository. Student projections omit instructor diagnostics. The build produces `dist/backend` and `dist/web`; `npm start` runs the compiled backend and can serve the built frontend. A separately hosted Vite frontend needs its backend API base at build time.
+
+Supply backend settings through the process environment or hosting secret manager; the server does not automatically load `.env` files. `.env.example` contains documentation and empty credential slots, not usable secrets.
+
+| Variable | Use |
+|---|---|
+| DATABASE_URL | Required backend PostgreSQL connection; never expose to Vite |
+| FLEXEE_INSTRUCTOR_PASSPHRASE | Required private instructor sign-in secret; no default |
+| FLEXEE_POSTGRES_SSL | `disable` only for local non-production loopback PostgreSQL; `require` for Render (also the default) |
+| PGSSLMODE | Optional compatibility setting, only `require`/`disable`; must agree with FLEXEE_POSTGRES_SSL if both are set |
+| NODE_ENV | `production` on Render; local non-SSL development must not use production |
+| PORT | Backend listener, default 3001; use Render's supplied port |
+| TRUST_PROXY_HOPS | Default `0`; use `1` only after validating the single trusted proxy topology and forwarded-header sanitization |
+| TEST_DATABASE_URL | Dedicated disposable `_test` database, never the live game database |
+| VITE_API_BASE | Public frontend-only setting: `/api` for same origin or the HTTPS backend URL ending in `/api` |
+
+Do not put TLS query parameters in DATABASE_URL; use the explicit SSL settings. The existing accepted remote TLS policy remains encrypted but does not validate the certificate (`rejectUnauthorized:false`); production risk acceptance or a separately verified certificate-validation change is required.
+
+For local non-SSL PostgreSQL, set `FLEXEE_POSTGRES_SSL=disable` in the process environment, leave PGSSLMODE unset or matching, and supply credentials privately before the install/migrate/build commands above. Use `npm start` to check the compiled server, or `npm run dev` for source execution.
+
+Instructors sign in, create or select a game, save the team access details, and use the existing control room to inspect submissions and release rounds. Students join with their Game ID and team code, inspect available resources, submit decisions, and wait for instructor release. Existing round rules and corrections are unchanged. Sessions now expire after 24 hours and on backend restart; sign in again to access persisted work. See operations documentation for throttling, network recovery, backups, and uncertain session-creation responses.
 
 - [design/](design/): authoritative design inputs, build specifications, voice briefs, all ten week sources, artifacts, filenames, and Round 9 specifications.
 - [instructions/](instructions/): historical phase instructions, corrections, feedback, and owner decisions. Accepted amendments remain recorded here; historical status is not necessarily current status.

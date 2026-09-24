@@ -4,11 +4,13 @@ import {dayNineDefensible,accessEvidence,closeRound,createGame,submit} from '../
 import {createTranscript,discoverReyes,inferDirectFactualQuestion} from '../domain/conversations.js';
 import {markArtifactAccess} from '../domain/artifacts.js';
 import type {GameRepository} from '../persistence/repository.js';
+import {generateTeamCodes,sessionTeamNames} from './session-creation.js';
 
 type ConversationRequest={actorType:'advisor'|'stakeholder';actorId:string;message:string;directFactualQuestion?:boolean};
 export class SimulationService {
  constructor(private readonly repo:GameRepository){}
- create(teamNames:string[]){let game=createGame({teamNames,config:cloneConfig()});const existing=new Set(this.repo.list().flatMap(g=>g.teams.map(t=>t.id)));game={...game,teams:game.teams.map(team=>existing.has(team.id)?{...team,id:`${game.id}-${team.id}`} :team)};this.repo.create(game);return game;}
+ create(teamNames:string[],shortCodes=false){let game=createGame({teamNames,config:cloneConfig()});const existing=new Set(this.repo.list().flatMap(g=>g.teams.map(t=>t.id)));const codes=shortCodes?generateTeamCodes(teamNames.length):undefined;game={...game,teams:game.teams.map((team,i)=>({...team,id:existing.has(team.id)?`${game.id}-${team.id}`:team.id,...(codes?{accessCode:codes[i]}:{})}))};this.repo.create(game);return game;}
+ createSession(count:unknown){return this.create(sessionTeamNames(count),true);}
  list(){return this.repo.list();}
  get(id:string){const game=this.repo.get(id);if(!game)throw new Error('Game not found');return game;}
  private validateSubmission(gameId:string,teamId:string,payload:Record<string,unknown>){const current=this.get(gameId),team=current.teams.find(t=>t.id===teamId);if(!team)throw new Error('Team not found');if(current.activeRound===1){const opened=team.currentState.evidence.analyst_memo.accessed;if(opened&&payload.memo_handling==='not_found')throw new Error('Choose how the opened analyst memo was handled');if(!opened&&payload.memo_handling!=='not_found')throw new Error('Open the analyst memo before choosing how it was handled');}if(current.activeRound===10&&team.submissions.find(s=>s.round===6)?.payload.sourcing!=='retain_internal'&&!Array.isArray(payload.vendor_governance))throw new Error('vendor_governance is required after external sourcing');return current;}

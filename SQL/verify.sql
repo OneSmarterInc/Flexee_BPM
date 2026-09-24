@@ -8,7 +8,7 @@ SELECT name AS expected_table,EXISTS(SELECT 1 FROM information_schema.tables
 
 WITH expected(table_name,columns) AS (VALUES
  ('games','id,simulation_id,config_version,config_hash,config_snapshot,active_round,status,created_at'),
- ('teams','id,game_id,name,members,current_state,outcome,round_narratives'),
+ ('teams','id,game_id,name,members,current_state,outcome,round_narratives,access_code'),
  ('submissions','id,game_id,team_id,round,payload,submitter,submitted_at,config_version,config_hash,kind,corrections'),
  ('round_results','team_id,round,result'),('state_history','team_id,round,state'),
  ('transcripts','id,game_id,team_id,round,actor_type,actor_id,user_message,actor_reply,timestamp,context_hash,storage_order'),

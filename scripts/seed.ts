@@ -13,7 +13,7 @@ return count;
 export async function seed(service:PersistentSimulationService,count:number|undefined){
  if(count!==undefined){
   const game=await service.create(Array.from({length:count},(_,i)=>`Team ${String(i+1).padStart(2,'0')}`));
-  const codes=game.teams.map(team=>teamAccessCode(game.id,team.id));
+  const codes=game.teams.map(team=>team.accessCode??teamAccessCode(game.id,team.id));
   if(new Set(codes).size!==count)throw new Error(`Team-code collision in new game ${game.id}. Do not distribute it; create a fresh game.`);
   console.log(`Created fresh pilot game ${game.id}`);
   console.log(`Game ID: ${game.id}`);
@@ -23,7 +23,7 @@ export async function seed(service:PersistentSimulationService,count:number|unde
   let game=(await service.list()).find(unused);
   if(!game){game=await service.create(['Phase 5 Cold Run']);console.log(`Created cold-run game ${game.id}`);}else console.log(`Using existing untouched Round 1 game ${game.id}`);
   const team=game.teams.find(t=>t.submissions.length===0&&t.transcripts.length===0);
-  if(team){console.log(`Cold-run game ID: ${game.id}`);console.log(`Cold-run team: ${team.name}`);console.log(`Cold-run team code: ${teamAccessCode(game.id,team.id)}`);}
+  if(team){console.log(`Cold-run game ID: ${game.id}`);console.log(`Cold-run team: ${team.name}`);console.log(`Cold-run team code: ${team.accessCode??teamAccessCode(game.id,team.id)}`);}
  }
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){

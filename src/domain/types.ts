@@ -25,7 +25,7 @@ export interface Round3ArtifactContent {bottleneckMap:{stations:Array<{station:s
 export interface ArtifactVersion {id:string;label:string;isDefault:boolean;content:Record<string,unknown>}
 export interface ArtifactPage {page:number;title?:string;content:string}
 export interface Artifact {id:string;title?:string;round:RoundNumber;type:string;versions?:ArtifactVersion[];pages?:ArtifactPage[];content?:Record<string,unknown>;accessRules?:Record<string,unknown>;metadata?:Record<string,unknown>;studentContent:Record<string,unknown>;hiddenMetadata:Record<string,unknown>}
-export interface Team {id:string;name:string;members:string[];submissions:RoundSubmission[];results:RoundResult[];roundNarratives:RoundNarrativeSnapshot[];currentState:TeamState;stateHistory:TeamState[];transcripts:Transcript[];artifacts:Artifact[]}
+export interface Team {id:string;name:string;accessCode?:string;members:string[];submissions:RoundSubmission[];results:RoundResult[];roundNarratives:RoundNarrativeSnapshot[];currentState:TeamState;stateHistory:TeamState[];transcripts:Transcript[];artifacts:Artifact[]}
 export interface Game {id:string;simulationId:'the_reengineering_mandate';configVersion:'bpm-v1';configHash:string;configSnapshot:BpmConfig;teams:Team[];activeRound:RoundNumber;createdAt:string;status:'created'|'active'|'completed'}
 export interface CrisisDamage {scalars?:Partial<Record<ScalarKey,number>>;stakeholders?:Partial<Record<StakeholderId,{trust?:number;position?:number}>>;benefitUsd:number;delayDays?:number}
 export interface BpmConfig {
