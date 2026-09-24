@@ -45,7 +45,7 @@ describe('authoritative absence semantics',()=>{
  it('all-absent R10 completion is deterministic and produces no fabricated metric',()=>{const g=allAbsent(10),t=g.teams[0];expect(g.status).toBe('completed');expect(t.submissions).toHaveLength(10);expect(new Set(t.submissions.map(s=>s.round)).size).toBe(10);expect(t.currentState.scalars.discovery_depth).toBe(0);expect(['triumph','win_with_scars','squeak_through','disaster']).toContain(t.currentState.outcome);expect(Number.isFinite(t.currentState.scalars.defensible_benefit_usd)).toBe(true);expect(studentProjection(g,t.id).decision.metricSet).toEqual([]);expect(t.results[9].derived.monitoringMetrics).toEqual([]);expect(normalized(replayGame(g))).toEqual(normalized(g));expect(studentDebrief(t).panels).toHaveLength(3);});
 });
 
-describe.sequential('twelve-team ten-round SQLite force-release',()=>{
+describe('twelve-team ten-round SQLite force-release', ()=>{
  let dir:string,path:string,repo:SqliteGameRepository,service:SimulationService,g:Game,id:string,alwaysAbsent:string,mixed:string,control:string;
  beforeAll(()=>{dir=mkdtempSync(join(tmpdir(),'flexee-absence-'));path=join(dir,'verification.sqlite');repo=new SqliteGameRepository(path);service=new SimulationService(repo);g=service.create(Array.from({length:12},(_,i)=>'Verification '+(i+1)));id=g.id;alwaysAbsent=g.teams[11].id;mixed=g.teams[10].id;control=g.teams[0].id;});
  afterAll(()=>{repo.close();rmSync(dir,{recursive:true,force:true});});
